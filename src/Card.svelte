@@ -1,12 +1,24 @@
 <script lang="ts">
-import type { CardType } from "./types/Card.type";
+    import type { CardType } from "./types/Card.type";
     export let card: CardType
     export let hidden: boolean;
 </script>
 <div>
     <div class="card">
         {#if !hidden}
-            {card.value} <br/>{card.suit}
+            {#if card.value == 1}
+                Ace
+            {:else if card.value  < 11}
+                {card.value}
+            {:else if card.value == 11}
+                Jack
+            {:else if card.value == 12}
+                Queen
+            {:else}
+                King
+            {/if}
+            <br/>
+            {card.suit}
         {:else}
             Hidden
         {/if}

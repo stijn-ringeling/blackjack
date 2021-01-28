@@ -1,4 +1,7 @@
+import type { SuitType } from "./Suit.type";
+import type { ValueType } from "./Value.type";
+
 export type CardType = {
-    suit: String,
-    value: String | number
+    suit: SuitType,
+    value: ValueType
 }

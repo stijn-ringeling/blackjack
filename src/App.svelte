@@ -3,9 +3,12 @@ import { tick } from "svelte";
 
 	import Card from "./Card.svelte";
 import Hand, { calculateValue } from "./Hand.svelte";
+import Player from "./Player.svelte";
 	import type { CardType } from "./types/Card.type";
 	import type { DeckType } from "./types/Deck.type";
 	import type { HandType } from "./types/hand.type";
+import { SuitType } from "./types/Suit.type";
+import { ValueType } from "./types/Value.type";
 	let deck:DeckType = createDeck();
 	
 	let player:HandType;
@@ -17,11 +20,14 @@ import Hand, { calculateValue } from "./Hand.svelte";
 
 	function createDeck():DeckType {
 		let deck: DeckType = {cards: []};
-		["Diamonds", "Hearts", "Spades", "Clubs"].forEach(suit => {
-			["Ace", 2, 3, 4, 5, 6, 7, 8, 9, 10, "Jack", "Queen", "King"].forEach(value => {
-				deck.cards = [...deck.cards, {value: value, suit: suit}];
-			});
-		});
+		for (let suit in SuitType){
+			for(let value=1; value <= 13; value++){ //Loop over all integers in ValueType enum
+				const s: SuitType = SuitType[suit];
+				//const v: ValueType = ValueType[value];
+				deck.cards = [...deck.cards, {value: value, suit: s}];
+			}
+		}
+		SuitType.Clubs
 	return deck;
 	}
 
@@ -100,9 +106,7 @@ import Hand, { calculateValue } from "./Hand.svelte";
 		<Hand bind:hand={dealer} dealer={!standing}/>
 	</div>
 	<div class="controls">
-		{#if !standing}
-			<button on:click={hit} class="hit" >Hit!</button> <button on:click={stand} class="stand">Stand</button>
-		{:else}
+		{#if standing}
 			{#if result === "win"}
 				<h1>You won!</h1>
 			{:else if result === "lose"}
@@ -115,7 +119,7 @@ import Hand, { calculateValue } from "./Hand.svelte";
 	</div>
 	
 	<div class="player">
-		<Hand bind:hand={player}/>
+		<Player bind:hand={player} control={!standing} on:hit={hit} on:stand={stand}/>
 	</div>
 	
 </main>
