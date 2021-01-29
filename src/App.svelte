@@ -1,22 +1,27 @@
 <script lang="ts">
 import { tick } from "svelte";
+import { handle_promise } from "svelte/internal";
 
 	import Card from "./Card.svelte";
-import Hand, { calculateValue } from "./Hand.svelte";
-import Player from "./Player.svelte";
+	import Hand, { calculateValue } from "./Hand.svelte";
+	import Player from "./Player.svelte";
 	import type { CardType } from "./types/Card.type";
 	import type { DeckType } from "./types/Deck.type";
 	import type { HandType } from "./types/hand.type";
-import { SuitType } from "./types/Suit.type";
-import { ValueType } from "./types/Value.type";
+	import type { PlayerType } from "./types/Player.type";
+	import { SuitType } from "./types/Suit.type";
+	import { ValueType } from "./types/Value.type";
 	let deck:DeckType = createDeck();
 	
-	let player:HandType;
+	//let player:HandType;
+	let players: PlayerType[];
 
-	let dealer:HandType;
+	let dealer:PlayerType;
 
-	let standing: boolean;
-	let result: "win" | "lose" | "draw";
+	let gameOver: boolean;
+
+	//let standing: boolean;
+	//let result: "win" | "lose" | "draw";
 
 	function createDeck():DeckType {
 		let deck: DeckType = {cards: []};
@@ -27,45 +32,44 @@ import { ValueType } from "./types/Value.type";
 				deck.cards = [...deck.cards, {value: value, suit: s}];
 			}
 		}
-		SuitType.Clubs
-	return deck;
+		return deck;
 	}
 
-	function drawPlayer(): void{
+	function draw(hand: HandType):void{
 		let index = Math.floor(Math.random() * deck.cards.length);
-		player.cards = [...player.cards, deck.cards[index]];
+		hand.cards = [...hand.cards, deck.cards[index]];
 		deck.cards.splice(index, 1);
 		deck.cards = [...deck.cards];
 	}
 
-	function drawDealer(): void{
-		let index = Math.floor(Math.random() * deck.cards.length);
-		dealer.cards = [...dealer.cards, deck.cards[index]];
-		deck.cards.splice(index, 1);
-		deck.cards = [...deck.cards];
-	}
-
-	function hit(): void{
-		drawPlayer();
-		player.value = calculateValue(player.cards);
-		player.bust = player.value > 21;
-		if (player.value >= 21){
-			stand();
+	function hit(player: PlayerType): void{
+		draw(player.hand);
+		player.hand.value = calculateValue(player.hand.cards);
+		player.hand.bust = player.hand.value > 21;
+		if (player.hand.value >= 21){
+			stand(player);
 		}
+		checkShouldEnd();
+		players = [...players];
 	}
 	
-	function stand():void{
-		standing = true;
+	function stand(player:PlayerType):void{
+		player.standing = true;
+		
+		checkShouldEnd();
+
+		players = [...players];
+		/*
 		if(player.value >= 21){
 			result = player.value == 21? "win": "lose";
 			return;
 		}
 		if (dealer.value <= 18){
-			drawDealer();
+			draw(dealer);
 			dealer.value = calculateValue(dealer.cards);
 		}
 		while (dealer.value < 17 && deck.cards.length > 0 ){
-			drawDealer();
+			draw(dealer);
 			dealer.value = calculateValue(dealer.cards);
 		}
 		dealer.bust = dealer.value > 21;
@@ -77,49 +81,125 @@ import { ValueType } from "./types/Value.type";
 			result = "draw";
 			return;
 		}
-		result = dealer.value > player.value ? "lose" : "win";
+		result = dealer.value > player.value ? "lose" : "win";*/
+	}
+
+	function checkShouldEnd():void{
+		let allDone = true;
+		for (const player in players) {
+			if (Object.prototype.hasOwnProperty.call(players, player)) {
+				const element = players[player];
+				if(!element.standing) allDone = false;
+			}
+		}
+		if(allDone){
+			endGame();
+		}
 	}
 
 	function newGame():void{
+		let numPlayers = 2;
 		deck = createDeck();
-		player = {cards: [], value: 0, bust:false};
-		dealer = {cards: [], value: 0, bust:false};
-
-		drawDealer();
-		drawDealer();
-		drawPlayer();
-		drawPlayer();
-		standing = false;
-
-		dealer.value = calculateValue(dealer.cards);
-		player.value = calculateValue(player.cards);
-		if (player.value == 21){
-			stand();
+		players = [];
+		for(let i = 0; i < numPlayers; i++){ // Create all player objects
+			
+			let hand = {cards: [], value: 0, bust: false};
+			let player: PlayerType = {hand: hand, standing: false, result: undefined};
+			draw(player.hand);
+			draw(player.hand);
+			player.hand.value = calculateValue(player.hand.cards);
+			if (player.hand.value == 21){
+				stand(player);
+			}
+			players = [...players, player]
 		}
+		dealer = {hand: {cards: [], value: 0, bust:false}, standing: false, result: undefined};
+
+		draw(dealer.hand);
+		draw(dealer.hand);
+
+		dealer.hand.value = calculateValue(dealer.hand.cards);
+		gameOver = false;
 	}
+
+	function endGame(){
+		//Check which players were bust/won
+		gameOver = true;
+		let playersDone = 0;
+		for (const player in players) {
+			if (Object.prototype.hasOwnProperty.call(players, player)) {
+				const element = players[player];
+				if(element.hand.value >= 21){
+					playersDone++;
+					element.result = element.hand.value == 21? "won": "lost";
+					continue;
+				}
+			}
+		}
+		if(playersDone >= players.length){
+			return;
+		}
+		//Have dealer draw cards until 17.
+		if (dealer.hand.value <= 18){
+			draw(dealer.hand);
+			dealer.hand.value = calculateValue(dealer.hand.cards);
+		}
+		while (dealer.hand.value < 17 && deck.cards.length > 0 ){
+			draw(dealer.hand);
+			dealer.hand.value = calculateValue(dealer.hand.cards);
+		}
+		dealer.hand.bust = dealer.hand.value > 21;
+		for (const player in players) {
+			if (Object.prototype.hasOwnProperty.call(players, player)) {
+				const element = players[player];
+				if (element.result !== undefined) continue;
+				if(element.hand.value <= 21 && dealer.hand.bust){
+					element.result = "won";
+					continue;
+				}
+				if(!dealer.hand.bust){
+					if(element.hand.value < dealer.hand.value){
+						element.result = "lost";
+					}else if(element.hand.value > dealer.hand.value){
+						element.result = "won";
+					}else {
+						element.result = "draw"
+					}
+				}
+			}
+		}	
+		
+	}
+
 	newGame();
 </script>
 
 <main>
 	
 	<div class="dealer">
-		<Hand bind:hand={dealer} dealer={!standing}/>
+		<Hand bind:hand={dealer.hand} dealer={!gameOver}/>
 	</div>
-	<div class="controls">
-		{#if standing}
-			{#if result === "win"}
+	
+	{#if gameOver}
+		<button on:click={newGame}>New Game</button>
+	{/if}
+	<div class="players">
+		{#each players as player}
+		<div class="controls">
+			{#if gameOver}
+			{#if player.result === "won"}
 				<h1>You won!</h1>
-			{:else if result === "lose"}
+			{:else if player.result === "lost"}
 				<h1>You lost. Want to play again?</h1>
 				{:else}
 					<h1>Draw!</h1>
-					{/if}
-		<button on:click={newGame}>New Game</button>
-	{/if}
-	</div>
-	
-	<div class="player">
-		<Player bind:hand={player} control={!standing} on:hit={hit} on:stand={stand}/>
+				{/if}
+			{/if}
+		</div>
+			
+			<Player bind:hand={player.hand} control={!player.standing} on:hit={() => hit(player)} on:stand={() => stand(player)}/>
+		{/each}
+		
 	</div>
 	
 </main>
@@ -150,15 +230,8 @@ import { ValueType } from "./types/Value.type";
 		margin-bottom: 2em;
 	}
 
-	.player {
+	.players {
 		margin-bottom: 2em;
 	}
 
-	.hit {
-		background-color: greenyellow;
-	}
-
-	.stand {
-		background-color: orangered;
-	}
 </style>
